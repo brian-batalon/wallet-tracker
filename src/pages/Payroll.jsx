@@ -7,6 +7,7 @@ export default function Payroll() {
   const [user, setUser] = useState(null)
   const [payrollHistory, setPayrollHistory] = useState([])
   const [showForm, setShowForm] = useState(false)
+  const [editingPayroll, setEditingPayroll] = useState(null)
   const [form, setForm] = useState({
     basic_salary: '', allowances_total: '', deductions: '', date_received: ''
   })
@@ -35,18 +36,53 @@ export default function Payroll() {
     const deductions = parseFloat(form.deductions) || 0
     const net = basic + allowances - deductions
 
-    const { error } = await supabase.from('payroll').insert({
-      user_id: user.id, basic_salary: basic, allowances_total: allowances, deductions, net_pay: net,
-      date_received: form.date_received || new Date().toISOString().split('T')[0]
-    })
+    if (editingPayroll) {
+      const { error } = await supabase.from('payroll').update({
+        basic_salary: basic, allowances_total: allowances, deductions, net_pay: net,
+        date_received: form.date_received
+      }).eq('id', editingPayroll.id)
 
+      if (error) { addToast(error.message, 'error') }
+      else {
+        setPayrollHistory(prev => prev.map(p => p.id === editingPayroll.id ? { ...p, basic_salary: basic, allowances_total: allowances, deductions, net_pay: net, date_received: form.date_received } : p))
+        addToast('Payroll updated!', 'success')
+      }
+    } else {
+      const { error } = await supabase.from('payroll').insert({
+        user_id: user.id, basic_salary: basic, allowances_total: allowances, deductions, net_pay: net,
+        date_received: form.date_received || new Date().toISOString().split('T')[0]
+      })
+
+      if (error) { addToast(error.message, 'error') }
+      else {
+        const { data } = await supabase.from('payroll').select('*').eq('user_id', user.id).order('date_received', { ascending: false })
+        setPayrollHistory(data || [])
+        addToast('Payroll added!', 'success')
+      }
+    }
+
+    setShowForm(false)
+    setEditingPayroll(null)
+    setForm({ basic_salary: '', allowances_total: '', deductions: '', date_received: '' })
+  }
+
+  const handleEdit = (payroll) => {
+    setEditingPayroll(payroll)
+    setForm({
+      basic_salary: payroll.basic_salary,
+      allowances_total: payroll.allowances_total,
+      deductions: payroll.deductions,
+      date_received: payroll.date_received
+    })
+    setShowForm(true)
+  }
+
+  const handleDelete = async (payrollId) => {
+    const { error } = await supabase.from('payroll').delete().eq('id', payrollId)
     if (error) { addToast(error.message, 'error') }
     else {
-      addToast('Payroll added!', 'success')
-      setShowForm(false)
-      setForm({ basic_salary: '', allowances_total: '', deductions: '', date_received: '' })
-      const { data } = await supabase.from('payroll').select('*').eq('user_id', user.id).order('date_received', { ascending: false })
-      setPayrollHistory(data || [])
+      setPayrollHistory(prev => prev.filter(p => p.id !== payrollId))
+      addToast('Payroll deleted', 'success')
     }
   }
 
@@ -100,7 +136,7 @@ export default function Payroll() {
           </div>
         </div>
 
-        <button onClick={() => setShowForm(true)} className="w-full bg-red-800 text-white py-3 rounded-xl font-medium hover:bg-red-900 transition shadow-sm mb-6 animate-slide-up">
+        <button onClick={() => { setEditingPayroll(null); setForm({ basic_salary: '', allowances_total: '', deductions: '', date_received: '' }); setShowForm(true); }} className="w-full bg-red-800 text-white py-3 rounded-xl font-medium hover:bg-red-900 transition shadow-sm mb-6 animate-slide-up">
           + Add Payroll Entry
         </button>
 
@@ -115,7 +151,15 @@ export default function Payroll() {
               <div key={p.id} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 animate-slide-up">
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-slate-800 font-semibold">{formatCurrency(p.net_pay)}</span>
-                  <span className="text-xs text-slate-400">{new Date(p.date_received).toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-400">{new Date(p.date_received).toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+                    <button onClick={() => handleEdit(p)} className="text-blue-400 hover:text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg p-1.5 transition">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                    </button>
+                    <button onClick={() => handleDelete(p.id)} className="text-red-400 hover:text-red-600 bg-red-50 hover:bg-red-100 rounded-lg p-1.5 transition">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    </button>
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-1 text-xs">
                   <span className="text-slate-500">Gross:</span>
@@ -130,15 +174,15 @@ export default function Payroll() {
       </div>
 
       {showForm && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 animate-fade-in" onClick={() => setShowForm(false)}>
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 animate-fade-in" onClick={() => { setShowForm(false); setEditingPayroll(null); }}>
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-scale-in" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-slate-800 font-bold text-lg mb-4">Add Payroll Entry</h3>
+            <h3 className="text-slate-800 font-bold text-lg mb-4">{editingPayroll ? 'Edit Payroll Entry' : 'Add Payroll Entry'}</h3>
             <form onSubmit={handleSubmit} className="space-y-3">
               <div><label className="text-slate-600 text-xs mb-1 block">Date Received</label><input type="date" value={form.date_received} onChange={(e) => setForm({...form, date_received: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-red-400" required /></div>
               <div><label className="text-slate-600 text-xs mb-1 block">Basic Salary (₱)</label><input type="number" step="0.01" value={form.basic_salary} onChange={(e) => setForm({...form, basic_salary: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-red-400" placeholder="0.00" /></div>
               <div><label className="text-slate-600 text-xs mb-1 block">Company Allowances (₱)</label><input type="number" step="0.01" value={form.allowances_total} onChange={(e) => setForm({...form, allowances_total: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-red-400" placeholder="0.00" /></div>
               <div><label className="text-slate-600 text-xs mb-1 block">Deductions (₱)</label><input type="number" step="0.01" value={form.deductions} onChange={(e) => setForm({...form, deductions: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-red-400" placeholder="0.00" /></div>
-              <button type="submit" className="w-full bg-red-800 text-white p-3 rounded-xl font-semibold hover:bg-red-900 transition">Save Payroll</button>
+              <button type="submit" className="w-full bg-red-800 text-white p-3 rounded-xl font-semibold hover:bg-red-900 transition">{editingPayroll ? 'Update Payroll' : 'Save Payroll'}</button>
             </form>
           </div>
         </div>
