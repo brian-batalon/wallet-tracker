@@ -416,7 +416,7 @@ export default function FieldArea() {
                   </div>
                   <button onClick={() => { setSelectedAllowance(allowance); setExpenseForm({ amount: '', description: '', transportType: '' }); setShowExpenseModal(true); }}
                     className={`px-4 py-2 text-white rounded-xl text-sm font-medium hover:opacity-90 transition bg-gradient-to-r ${color.from} ${color.to}`}>
-                    - Spend
+                    Spend
                   </button>
                 </div>
 
