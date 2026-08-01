@@ -47,6 +47,7 @@ export default function Dashboard() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { navigate('/'); return }
     setUser(user)
+
     const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
     setProfile(profile)
     if (profile) {
@@ -59,14 +60,17 @@ export default function Dashboard() {
         address: profile.address || '',
         company_name: profile.company_name || ''
       })
-      if (profile.avatar_url) setAvatarUrl(profile.avatar_url)
+      setAvatarUrl(profile.avatar_url || null)
       if (profile.avatar_position) setAvatarPosition(profile.avatar_position)
       if (profile.avatar_scale) setAvatarScale(profile.avatar_scale)
     }
+
     const { data: fields } = await supabase.from('field_areas').select('*, field_allowances(*)').eq('user_id', user.id).order('created_at', { ascending: false })
     setFieldAreas(fields || [])
+
     const { data: payrollData } = await supabase.from('payroll').select('*').eq('user_id', user.id).order('date_received', { ascending: false }).limit(1).maybeSingle()
     setPayroll(payrollData)
+
     setLoading(false)
   }, [navigate])
 
@@ -75,7 +79,10 @@ export default function Dashboard() {
   const handleSwitchCard = () => {
     setSwitching(true)
     setCardFlipped(false)
-    setTimeout(() => { setCardMode(prev => prev === 'payroll' ? 'field' : 'payroll'); setTimeout(() => setSwitching(false), 50) }, 200)
+    setTimeout(() => {
+      setCardMode(prev => prev === 'payroll' ? 'field' : 'payroll')
+      setTimeout(() => setSwitching(false), 50)
+    }, 200)
   }
 
   const handleLogout = async () => { await supabase.auth.signOut(); navigate('/') }
@@ -85,7 +92,10 @@ export default function Dashboard() {
     if (!file) return
     setTempAvatarFile(file)
     const reader = new FileReader()
-    reader.onload = (event) => { setTempAvatarPreview(event.target.result); setShowCropModal(true) }
+    reader.onload = (event) => {
+      setTempAvatarPreview(event.target.result)
+      setShowCropModal(true)
+    }
     reader.readAsDataURL(file)
   }
 
@@ -112,12 +122,12 @@ export default function Dashboard() {
     if (uploadError) { addToast(uploadError.message, 'error'); return }
     const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName)
     await supabase.from('profiles').update({ avatar_url: publicUrl, avatar_position: avatarPosition, avatar_scale: avatarScale }).eq('id', user.id)
-    setAvatarUrl(publicUrl)
     setShowCropModal(false)
     setTempAvatarFile(null)
     setTempAvatarPreview(null)
     setIsDragging(false)
     addToast('Profile picture updated!', 'success')
+    fetchData()
   }
 
   const handleCropCancel = () => {
@@ -138,7 +148,9 @@ export default function Dashboard() {
 
   const handleAddField = async (e) => {
     e.preventDefault()
-    const { data, error } = await supabase.from('field_areas').insert({ user_id: user.id, name: newField.name, location: newField.location, color: newField.color }).select().single()
+    const { data, error } = await supabase.from('field_areas').insert({ 
+      user_id: user.id, name: newField.name, location: newField.location, color: newField.color 
+    }).select().single()
     if (error) { addToast(error.message, 'error'); return }
     const allowances = []
     if (newField.transportAmount) allowances.push({ category: 'transport', name: 'Transport Allowance', total_amount: parseFloat(newField.transportAmount), spent_amount: 0, field_area_id: data.id, user_id: user.id, excluded: false })
@@ -214,89 +226,219 @@ export default function Dashboard() {
         {/* ATM Card Stack */}
         <div className="mb-6 animate-slide-up flex flex-col items-center">
           <div className="relative w-full max-w-[320px] sm:max-w-sm md:max-w-md h-48 sm:h-52 md:h-56">
+            
+            {/* Back card (peeking) */}
             <div className="absolute inset-0 rounded-2xl md:rounded-3xl overflow-hidden shadow-lg opacity-75" style={{ transform: 'scale(0.90) translateY(25px)', zIndex: 0 }}>
               {cardMode === 'payroll' ? (
                 <div className="w-full h-full bg-gradient-to-br from-slate-800 via-gray-800 to-slate-900 p-4 sm:p-5">
-                  <div className="flex justify-between items-start mb-4"><div className="w-8 sm:w-10 h-6 sm:h-7 bg-gradient-to-br from-gray-400 to-gray-500 rounded-md"></div><p className="text-white/50 text-[10px] sm:text-xs font-bold tracking-widest">FIELD</p></div>
-                  <p className="text-white/30 text-[10px] sm:text-xs">REMAINING BUDGET</p><p className="text-white/70 text-lg sm:text-xl font-bold mt-1">{formatCurrency(totalFieldRemaining)}</p>
-                  <div className="flex justify-between items-end mt-4"><div><p className="text-white/30 text-[10px] sm:text-xs">CARD HOLDER</p><p className="text-white/60 text-xs sm:text-sm uppercase truncate">{(profile?.full_name || 'USER')}</p></div></div>
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="w-8 sm:w-10 h-6 sm:h-7 bg-gradient-to-br from-gray-400 to-gray-500 rounded-md"></div>
+                    <p className="text-white/50 text-[10px] sm:text-xs font-bold tracking-widest">FIELD</p>
+                  </div>
+                  <p className="text-white/30 text-[10px] sm:text-xs">REMAINING BUDGET</p>
+                  <p className="text-white/70 text-lg sm:text-xl font-bold mt-1">{formatCurrency(totalFieldRemaining)}</p>
+                  <div className="flex justify-between items-end mt-4">
+                    <div>
+                      <p className="text-white/30 text-[10px] sm:text-xs">CARD HOLDER</p>
+                      <p className="text-white/60 text-xs sm:text-sm uppercase truncate">{(profile?.full_name || 'USER')}</p>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <div className="w-full h-full bg-gradient-to-br from-red-950 via-red-900 to-slate-950 p-4 sm:p-5">
-                  <div className="flex justify-between items-start mb-4"><div className="w-8 sm:w-10 h-6 sm:h-7 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-md"></div><p className="text-white/50 text-[10px] sm:text-xs font-bold tracking-widest">PAYROLL</p></div>
-                  <p className="text-white/30 text-[10px] sm:text-xs">NET PAY</p><p className="text-white/70 text-lg sm:text-xl font-bold mt-1">{formatCurrency(payroll?.net_pay || 0)}</p>
-                  <div className="flex justify-between items-end mt-4"><div><p className="text-white/30 text-[10px] sm:text-xs">CARD HOLDER</p><p className="text-white/60 text-xs sm:text-sm uppercase truncate">{(profile?.full_name || 'USER')}</p></div></div>
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="w-8 sm:w-10 h-6 sm:h-7 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-md"></div>
+                    <p className="text-white/50 text-[10px] sm:text-xs font-bold tracking-widest">PAYROLL</p>
+                  </div>
+                  <p className="text-white/30 text-[10px] sm:text-xs">NET PAY</p>
+                  <p className="text-white/70 text-lg sm:text-xl font-bold mt-1">{formatCurrency(payroll?.net_pay || 0)}</p>
+                  <div className="flex justify-between items-end mt-4">
+                    <div>
+                      <p className="text-white/30 text-[10px] sm:text-xs">CARD HOLDER</p>
+                      <p className="text-white/60 text-xs sm:text-sm uppercase truncate">{(profile?.full_name || 'USER')}</p>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
-            <div className="absolute inset-0 rounded-2xl md:rounded-3xl overflow-hidden" style={{ zIndex: 1 }}>
-              <div className={`w-full h-full transition-all duration-300 cursor-pointer ${switching ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`} onClick={() => setCardFlipped(!cardFlipped)}>
+
+            {/* Front card */}
+            <div className="absolute inset-0" style={{ zIndex: 1 }}>
+              <div 
+                className={`w-full h-full transition-all duration-300 cursor-pointer ${switching ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`} 
+                onClick={() => setCardFlipped(!cardFlipped)}
+              >
                 <div className={`relative w-full h-full transition-transform duration-300 transform-style-3d ${cardFlipped ? 'rotate-y-180' : ''}`}>
+                  
+                  {/* Card Front */}
                   <div className="absolute inset-0 backface-hidden">
                     {cardMode === 'payroll' ? (
-                      <div className="w-full h-full bg-gradient-to-br from-red-950 via-red-900 to-slate-950 p-4 sm:p-5 md:p-7 relative">
+                      <div className="w-full h-full bg-gradient-to-br from-red-950 via-red-900 to-slate-950 p-4 sm:p-5 md:p-7 relative rounded-2xl md:rounded-3xl overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12"></div>
                         <div className="absolute top-0 right-0 w-32 h-32 bg-red-800/20 rounded-full blur-2xl"></div>
                         <div className="relative z-10">
-                          <div className="flex justify-between items-start mb-4"><div className="w-8 sm:w-10 md:w-12 h-6 sm:h-7 md:h-8 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-md shadow-inner"></div><p className="text-white/80 text-[10px] sm:text-xs font-bold tracking-widest">PAYROLL</p></div>
-                          <p className="text-white/60 text-[10px] sm:text-xs">NET PAY</p><p className="text-white text-lg sm:text-xl md:text-3xl font-bold mt-1 mb-4 sm:mb-6 truncate">{formatCurrency(payroll?.net_pay || 0)}</p>
-                          <div className="flex justify-between items-end"><div className="min-w-0"><p className="text-white/40 text-[10px] sm:text-xs">CARD HOLDER</p><p className="text-white text-xs sm:text-sm uppercase truncate max-w-[120px] sm:max-w-[160px]">{(profile?.full_name || 'USER')}</p></div><div className="flex -space-x-2 flex-shrink-0"><div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-red-500/60"></div><div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-yellow-500/60"></div></div></div>
+                          <div className="flex justify-between items-start mb-4">
+                            <div className="w-8 sm:w-10 md:w-12 h-6 sm:h-7 md:h-8 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-md shadow-inner"></div>
+                            <p className="text-white/80 text-[10px] sm:text-xs font-bold tracking-widest">PAYROLL</p>
+                          </div>
+                          <p className="text-white/60 text-[10px] sm:text-xs">NET PAY</p>
+                          <p className="text-white text-lg sm:text-xl md:text-3xl font-bold mt-1 mb-4 sm:mb-6 truncate">{formatCurrency(payroll?.net_pay || 0)}</p>
+                          <div className="flex justify-between items-end">
+                            <div className="min-w-0">
+                              <p className="text-white/40 text-[10px] sm:text-xs">CARD HOLDER</p>
+                              <p className="text-white text-xs sm:text-sm uppercase truncate max-w-[120px] sm:max-w-[160px]">{(profile?.full_name || 'USER')}</p>
+                            </div>
+                            <div className="flex -space-x-2 flex-shrink-0">
+                              <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-red-500/60"></div>
+                              <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-yellow-500/60"></div>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-slate-800 via-gray-800 to-slate-900 p-4 sm:p-5 md:p-7 relative">
+                      <div className="w-full h-full bg-gradient-to-br from-slate-800 via-gray-800 to-slate-900 p-4 sm:p-5 md:p-7 relative rounded-2xl md:rounded-3xl overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12"></div>
                         <div className="absolute top-0 right-0 w-32 h-32 bg-slate-600/20 rounded-full blur-2xl"></div>
                         <div className="relative z-10">
-                          <div className="flex justify-between items-start mb-4"><div className="w-8 sm:w-10 md:w-12 h-6 sm:h-7 md:h-8 bg-gradient-to-br from-gray-300 to-gray-400 rounded-md shadow-inner"></div><p className="text-white/80 text-[10px] sm:text-xs font-bold tracking-widest">FIELD</p></div>
-                          <p className="text-white/60 text-[10px] sm:text-xs">REMAINING BUDGET</p><p className="text-white text-lg sm:text-xl md:text-3xl font-bold mt-1 mb-4 sm:mb-6 truncate">{formatCurrency(totalFieldRemaining)}</p>
-                          <div className="flex justify-between items-end"><div className="min-w-0"><p className="text-white/40 text-[10px] sm:text-xs">CARD HOLDER</p><p className="text-white text-xs sm:text-sm uppercase truncate max-w-[120px] sm:max-w-[160px]">{(profile?.full_name || 'USER')}</p></div><div className="flex -space-x-2 flex-shrink-0"><div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gray-400/60"></div><div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-slate-500/60"></div></div></div>
+                          <div className="flex justify-between items-start mb-4">
+                            <div className="w-8 sm:w-10 md:w-12 h-6 sm:h-7 md:h-8 bg-gradient-to-br from-gray-300 to-gray-400 rounded-md shadow-inner"></div>
+                            <p className="text-white/80 text-[10px] sm:text-xs font-bold tracking-widest">FIELD</p>
+                          </div>
+                          <p className="text-white/60 text-[10px] sm:text-xs">REMAINING BUDGET</p>
+                          <p className="text-white text-lg sm:text-xl md:text-3xl font-bold mt-1 mb-4 sm:mb-6 truncate">{formatCurrency(totalFieldRemaining)}</p>
+                          <div className="flex justify-between items-end">
+                            <div className="min-w-0">
+                              <p className="text-white/40 text-[10px] sm:text-xs">CARD HOLDER</p>
+                              <p className="text-white text-xs sm:text-sm uppercase truncate max-w-[120px] sm:max-w-[160px]">{(profile?.full_name || 'USER')}</p>
+                            </div>
+                            <div className="flex -space-x-2 flex-shrink-0">
+                              <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gray-400/60"></div>
+                              <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-slate-500/60"></div>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     )}
                   </div>
+
+                  {/* Card Back */}
                   <div className="absolute inset-0 backface-hidden rotate-y-180">
                     {cardMode === 'payroll' ? (
-                      <div className="w-full h-full bg-gradient-to-br from-red-950 via-slate-900 to-black p-4 sm:p-5 md:p-7"><div className="absolute top-6 left-0 right-0 h-8 bg-gray-950"></div><div className="mt-12 sm:mt-14 space-y-1 sm:space-y-1.5 text-white/80 text-[10px] sm:text-xs"><p className="truncate">👤 {profile?.full_name || 'Not set'}</p><p className="truncate">🏢 {profile?.company_name || 'Company'}</p><p className="truncate">🆔 {profile?.employee_id || 'Not set'}</p><p className="truncate">📞 {profile?.contact_number || 'Not set'}</p><p className="truncate">📍 {profile?.address || 'Not set'}</p></div><div className="absolute bottom-4 right-4 text-white/30 text-[10px] sm:text-xs">PAYROLL CARD</div></div>
+                      <div className="w-full h-full bg-gradient-to-br from-red-950 via-slate-900 to-black p-4 sm:p-5 md:p-7 rounded-2xl md:rounded-3xl overflow-hidden">
+                        <div className="absolute top-6 left-0 right-0 h-8 bg-gray-950"></div>
+                        <div className="mt-12 sm:mt-14 space-y-1 sm:space-y-1.5 text-white/80 text-[10px] sm:text-xs">
+                          <p className="truncate">👤 {profile?.full_name || 'Not set'}</p>
+                          <p className="truncate">🏢 {profile?.company_name || 'Company'}</p>
+                          <p className="truncate">🆔 {profile?.employee_id || 'Not set'}</p>
+                          <p className="truncate">📞 {profile?.contact_number || 'Not set'}</p>
+                          <p className="truncate">📍 {profile?.address || 'Not set'}</p>
+                        </div>
+                        <div className="absolute bottom-4 right-4 text-white/30 text-[10px] sm:text-xs">PAYROLL CARD</div>
+                      </div>
                     ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-slate-800 via-gray-900 to-black p-4 sm:p-5 md:p-7"><div className="absolute top-6 left-0 right-0 h-8 bg-gray-800"></div><div className="mt-12 sm:mt-14 space-y-1 sm:space-y-1.5 text-white/80 text-[10px] sm:text-xs"><p className="truncate">👤 {profile?.full_name || 'Not set'}</p><p className="truncate">🏢 {profile?.company_name || 'Company'}</p><p className="truncate">🆔 {profile?.employee_id || 'Not set'}</p><p className="truncate">📞 {profile?.contact_number || 'Not set'}</p><p className="truncate">📍 {profile?.address || 'Not set'}</p></div><div className="absolute bottom-4 right-4 text-white/30 text-[10px] sm:text-xs">FIELD CARD</div></div>
+                      <div className="w-full h-full bg-gradient-to-br from-slate-800 via-gray-900 to-black p-4 sm:p-5 md:p-7 rounded-2xl md:rounded-3xl overflow-hidden">
+                        <div className="absolute top-6 left-0 right-0 h-8 bg-gray-800"></div>
+                        <div className="mt-12 sm:mt-14 space-y-1 sm:space-y-1.5 text-white/80 text-[10px] sm:text-xs">
+                          <p className="truncate">👤 {profile?.full_name || 'Not set'}</p>
+                          <p className="truncate">🏢 {profile?.company_name || 'Company'}</p>
+                          <p className="truncate">🆔 {profile?.employee_id || 'Not set'}</p>
+                          <p className="truncate">📞 {profile?.contact_number || 'Not set'}</p>
+                          <p className="truncate">📍 {profile?.address || 'Not set'}</p>
+                        </div>
+                        <div className="absolute bottom-4 right-4 text-white/30 text-[10px] sm:text-xs">FIELD CARD</div>
+                      </div>
                     )}
                   </div>
                 </div>
               </div>
             </div>
           </div>
-          <button onClick={handleSwitchCard} className="mt-10 mb-2 w-11 h-11 rounded-full flex items-center justify-center hover:scale-110 transition-all shadow-lg" style={{ background: 'rgba(255, 255, 255, 0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255, 255, 255, 0.4)', boxShadow: '0 4px 15px rgba(0, 0, 0, 0.1)' }}>
-            <span className={`transition-transform duration-300 ${switching ? 'rotate-180' : ''}`}><img width="20" height="20" src="https://img.icons8.com/plumpy/24/process.png" alt="switch"/></span>
+
+          {/* Switch button */}
+          <button 
+            onClick={handleSwitchCard}
+            className="mt-10 mb-2 w-11 h-11 rounded-full flex items-center justify-center hover:scale-110 transition-all shadow-lg"
+            style={{ 
+              background: 'rgba(255, 255, 255, 0.25)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              border: '1px solid rgba(255, 255, 255, 0.4)',
+              boxShadow: '0 4px 15px rgba(0, 0, 0, 0.1)'
+            }}
+          >
+            <span className={`transition-transform duration-300 ${switching ? 'rotate-180' : ''}`}>
+              <img width="20" height="20" src="https://img.icons8.com/plumpy/24/process.png" alt="switch"/>
+            </span>
           </button>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 mb-6 animate-slide-up">
-          <div className="bg-white rounded-2xl p-3 sm:p-4 shadow-sm border border-slate-200"><p className="text-slate-500 text-[10px] sm:text-xs">Payroll</p><p className="text-slate-800 text-base sm:text-lg font-bold truncate">{formatCurrency(payroll?.net_pay || 0)}</p></div>
-          <div className="bg-white rounded-2xl p-3 sm:p-4 shadow-sm border border-slate-200"><p className="text-slate-500 text-[10px] sm:text-xs">Field Budget</p><p className="text-slate-800 text-base sm:text-lg font-bold truncate">{formatCurrency(totalFieldBudget)}</p></div>
-          <div className="bg-white rounded-2xl p-3 sm:p-4 shadow-sm border border-slate-200"><p className="text-slate-500 text-[10px] sm:text-xs">Spent</p><p className="text-red-500 text-base sm:text-lg font-bold truncate">{formatCurrency(totalFieldSpent)}</p></div>
-          <div className="bg-white rounded-2xl p-3 sm:p-4 shadow-sm border border-slate-200"><p className="text-slate-500 text-[10px] sm:text-xs">Remaining</p><p className="text-green-500 text-base sm:text-lg font-bold truncate">{formatCurrency(totalFieldRemaining)}</p></div>
+          <div className="bg-white rounded-2xl p-3 sm:p-4 shadow-sm border border-slate-200">
+            <p className="text-slate-500 text-[10px] sm:text-xs">Payroll</p>
+            <p className="text-slate-800 text-base sm:text-lg font-bold truncate">{formatCurrency(payroll?.net_pay || 0)}</p>
+          </div>
+          <div className="bg-white rounded-2xl p-3 sm:p-4 shadow-sm border border-slate-200">
+            <p className="text-slate-500 text-[10px] sm:text-xs">Field Budget</p>
+            <p className="text-slate-800 text-base sm:text-lg font-bold truncate">{formatCurrency(totalFieldBudget)}</p>
+          </div>
+          <div className="bg-white rounded-2xl p-3 sm:p-4 shadow-sm border border-slate-200">
+            <p className="text-slate-500 text-[10px] sm:text-xs">Spent</p>
+            <p className="text-red-500 text-base sm:text-lg font-bold truncate">{formatCurrency(totalFieldSpent)}</p>
+          </div>
+          <div className="bg-white rounded-2xl p-3 sm:p-4 shadow-sm border border-slate-200">
+            <p className="text-slate-500 text-[10px] sm:text-xs">Remaining</p>
+            <p className="text-green-500 text-base sm:text-lg font-bold truncate">{formatCurrency(totalFieldRemaining)}</p>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6 animate-slide-up">
-          <button onClick={() => navigate('/payroll')} className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-200 hover:shadow-md transition text-left"><span className="text-2xl sm:text-3xl">💼</span><h3 className="text-slate-800 font-semibold mt-2 text-sm sm:text-base">Payroll</h3><p className="text-slate-400 text-[10px] sm:text-xs mt-1">View salary & history</p>{payroll && <p className="text-green-600 font-bold text-xs sm:text-sm mt-2 truncate">{formatCurrency(payroll.net_pay)}</p>}</button>
-          <button onClick={() => setShowAddField(true)} className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-200 hover:shadow-md transition text-left"><span className="text-2xl sm:text-3xl">➕</span><h3 className="text-slate-800 font-semibold mt-2 text-sm sm:text-base">New Field</h3><p className="text-slate-400 text-[10px] sm:text-xs mt-1">Create field area</p></button>
+          <button onClick={() => navigate('/payroll')} className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-200 hover:shadow-md transition text-left">
+            <span className="text-2xl sm:text-3xl">💼</span>
+            <h3 className="text-slate-800 font-semibold mt-2 text-sm sm:text-base">Payroll</h3>
+            <p className="text-slate-400 text-[10px] sm:text-xs mt-1">View salary & history</p>
+            {payroll && <p className="text-green-600 font-bold text-xs sm:text-sm mt-2 truncate">{formatCurrency(payroll.net_pay)}</p>}
+          </button>
+          <button onClick={() => setShowAddField(true)} className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-slate-200 hover:shadow-md transition text-left">
+            <span className="text-2xl sm:text-3xl">➕</span>
+            <h3 className="text-slate-800 font-semibold mt-2 text-sm sm:text-base">New Field</h3>
+            <p className="text-slate-400 text-[10px] sm:text-xs mt-1">Create field area</p>
+          </button>
         </div>
 
         <div className="space-y-3">
           <h2 className="text-slate-800 font-semibold animate-slide-up">Field Areas</h2>
           {fieldAreas.length === 0 ? (
-            <div className="bg-white rounded-2xl p-8 text-center shadow-sm border border-slate-200 animate-slide-up"><p className="text-4xl mb-2">📋</p><p className="text-slate-500">No field areas yet</p></div>
+            <div className="bg-white rounded-2xl p-8 text-center shadow-sm border border-slate-200 animate-slide-up">
+              <p className="text-4xl mb-2">📋</p>
+              <p className="text-slate-500">No field areas yet</p>
+            </div>
           ) : (
             fieldAreas.map((field) => {
               const budget = (field.field_allowances || []).filter(a => !a.excluded).reduce((s, a) => s + (parseFloat(a.total_amount) || 0), 0)
               const spent = (field.field_allowances || []).filter(a => !a.excluded).reduce((s, a) => s + (parseFloat(a.spent_amount) || 0), 0)
               const color = FIELD_COLORS.find(c => c.name.toLowerCase() === (field.color || 'red')) || FIELD_COLORS[0]
               return (
-                <div key={field.id} onClick={() => navigate(`/field/${field.id}`)} className={`rounded-2xl p-4 sm:p-5 shadow-sm border cursor-pointer hover:shadow-md transition animate-slide-up ${color.bg} ${color.border}`}>
-                  <div className="flex justify-between items-start"><div className="min-w-0"><h3 className="text-slate-800 font-semibold truncate">{field.name}</h3><p className="text-slate-400 text-xs truncate">{field.location || 'No location'}</p></div><span className={`px-2 py-0.5 rounded-full text-xs flex-shrink-0 ml-2 ${field.status === 'active' ? 'bg-green-100 text-green-600' : field.status === 'completed' ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>{field.status}</span></div>
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3 text-xs sm:text-sm"><span className="text-slate-500">Budget: <span className="font-medium text-slate-700">{formatCurrency(budget)}</span></span><span className="text-slate-500">Spent: <span className="font-medium text-red-500">{formatCurrency(spent)}</span></span><span className="text-slate-500">Left: <span className="font-medium text-green-500">{formatCurrency(budget - spent)}</span></span></div>
-                  <div className="flex gap-1 mt-2">{(field.field_allowances || []).map(a => (<span key={a.id} className="text-base sm:text-lg">{a.category === 'transport' ? '🚗' : a.category === 'meal' ? '🍽️' : a.category === 'hotel' ? '🏨' : '📋'}</span>))}</div>
+                <div key={field.id} onClick={() => navigate(`/field/${field.id}`)} 
+                  className={`rounded-2xl p-4 sm:p-5 shadow-sm border cursor-pointer hover:shadow-md transition animate-slide-up ${color.bg} ${color.border}`}>
+                  <div className="flex justify-between items-start">
+                    <div className="min-w-0">
+                      <h3 className="text-slate-800 font-semibold truncate">{field.name}</h3>
+                      <p className="text-slate-400 text-xs truncate">{field.location || 'No location'}</p>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-full text-xs flex-shrink-0 ml-2 ${field.status === 'active' ? 'bg-green-100 text-green-600' : field.status === 'completed' ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>{field.status}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3 text-xs sm:text-sm">
+                    <span className="text-slate-500">Budget: <span className="font-medium text-slate-700">{formatCurrency(budget)}</span></span>
+                    <span className="text-slate-500">Spent: <span className="font-medium text-red-500">{formatCurrency(spent)}</span></span>
+                    <span className="text-slate-500">Left: <span className="font-medium text-green-500">{formatCurrency(budget - spent)}</span></span>
+                  </div>
+                  <div className="flex gap-1 mt-2">
+                    {(field.field_allowances || []).map(a => (
+                      <span key={a.id} className="text-base sm:text-lg">
+                        {a.category === 'transport' ? '🚗' : a.category === 'meal' ? '🍽️' : a.category === 'hotel' ? '🏨' : '📋'}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               )
             })
@@ -319,11 +461,18 @@ export default function Dashboard() {
                       <div className="w-full h-full flex items-center justify-center text-4xl">👤</div>
                     )}
                   </div>
-                  <label className="cursor-pointer px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs text-slate-600 transition text-center">Choose Photo<input type="file" accept="image/*" onChange={handleAvatarSelect} className="hidden" /></label>
+                  <label className="cursor-pointer px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs text-slate-600 transition text-center">
+                    Choose Photo
+                    <input type="file" accept="image/*" onChange={handleAvatarSelect} className="hidden" />
+                  </label>
                 </div>
               </div>
               {['full_name','employee_id','company_name','department','position','contact_number','address'].map(f => (
-                <div key={f}><label className="text-slate-600 text-xs mb-1 block capitalize">{f.replace('_',' ')}</label><input type="text" value={profileForm[f]} onChange={(e) => setProfileForm({...profileForm, [f]: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-red-400" /></div>
+                <div key={f}>
+                  <label className="text-slate-600 text-xs mb-1 block capitalize">{f.replace('_',' ')}</label>
+                  <input type="text" value={profileForm[f]} onChange={(e) => setProfileForm({...profileForm, [f]: e.target.value})}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-red-400" />
+                </div>
               ))}
               <button type="submit" className="w-full bg-slate-800 text-white p-3 rounded-xl font-semibold hover:bg-slate-900 transition">Save Profile</button>
             </form>
@@ -331,14 +480,13 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Crop/Position Modal with Square container, Circle guide, and Gridlines */}
+      {/* Crop/Position Modal */}
       {showCropModal && tempAvatarPreview && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 animate-fade-in" onMouseUp={handleCropMouseUp} onMouseLeave={handleCropMouseUp}>
           <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-scale-in">
             <h3 className="text-slate-800 font-bold text-lg mb-2">Position Photo</h3>
             <p className="text-slate-500 text-xs mb-4">Drag to reposition. Use slider to zoom.</p>
             
-            {/* Square container with gridlines and circle guide */}
             <div className="flex justify-center mb-4">
               <div 
                 ref={cropRef}
@@ -347,10 +495,8 @@ export default function Dashboard() {
                 onMouseDown={handleCropMouseDown}
                 onMouseMove={handleCropMouseMove}
               >
-                {/* Gridlines */}
                 <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'linear-gradient(rgba(0,0,0,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.05) 1px, transparent 1px)', backgroundSize: '25% 25%' }}></div>
                 
-                {/* Image */}
                 <img 
                   src={tempAvatarPreview} 
                   alt="Crop" 
@@ -359,14 +505,12 @@ export default function Dashboard() {
                   draggable={false}
                 />
                 
-                {/* Circle guide overlay */}
                 <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
                   <div className="w-60 h-60 rounded-full border-2 border-white shadow-[0_0_0_1000px_rgba(0,0,0,0.3)]"></div>
                 </div>
               </div>
             </div>
 
-            {/* Zoom slider */}
             <div className="mb-4">
               <label className="text-slate-600 text-xs mb-1 block">Zoom: {avatarScale.toFixed(1)}x</label>
               <input 
@@ -391,19 +535,59 @@ export default function Dashboard() {
       {showAddField && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 animate-fade-in" onClick={() => setShowAddField(false)}>
           <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-scale-in max-h-[85vh] overflow-y-auto no-scrollbar" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-4"><h3 className="text-slate-800 font-bold">New Field Area</h3><button onClick={() => setShowAddField(false)} className="text-slate-400 hover:text-slate-600"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg></button></div>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-slate-800 font-bold">New Field Area</h3>
+              <button onClick={() => setShowAddField(false)} className="text-slate-400 hover:text-slate-600">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
             <form onSubmit={handleAddField} className="space-y-4">
-              <div><label className="text-slate-600 text-sm mb-1 block">Field Name *</label><input type="text" value={newField.name} onChange={(e) => setNewField({...newField, name: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-red-400" required /></div>
-              <div><label className="text-slate-600 text-sm mb-1 block">Location</label><input type="text" value={newField.location} onChange={(e) => setNewField({...newField, location: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-red-400" /></div>
-              <div><label className="text-slate-600 text-sm mb-2 block">Color Theme</label><div className="grid grid-cols-4 gap-2">{FIELD_COLORS.map((c) => (<button key={c.name} type="button" onClick={() => setNewField({...newField, color: c.name.toLowerCase()})} className={`h-10 rounded-xl bg-gradient-to-r ${c.from} ${c.to} transition-all ${newField.color === c.name.toLowerCase() ? 'ring-2 ring-offset-2 ring-slate-400 scale-105' : 'hover:scale-105'}`}>{newField.color === c.name.toLowerCase() && <span className="text-white text-lg">✓</span>}</button>))}</div></div>
-              <div className="border-t pt-4"><p className="text-slate-600 text-sm font-medium mb-3">Allowance Budgets</p><div className="space-y-3"><div><label className="text-slate-500 text-xs mb-1 block">🚗 Transport</label><input type="number" step="0.01" value={newField.transportAmount} onChange={(e) => setNewField({...newField, transportAmount: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-red-400" placeholder="0.00" /></div><div><label className="text-slate-500 text-xs mb-1 block">🍽️ Meal</label><input type="number" step="0.01" value={newField.mealAmount} onChange={(e) => setNewField({...newField, mealAmount: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-red-400" placeholder="0.00" /></div><div><label className="text-slate-500 text-xs mb-1 block">🏨 Hotel</label><input type="number" step="0.01" value={newField.hotelAmount} onChange={(e) => setNewField({...newField, hotelAmount: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-red-400" placeholder="0.00" /></div></div></div>
+              <div>
+                <label className="text-slate-600 text-sm mb-1 block">Field Name *</label>
+                <input type="text" value={newField.name} onChange={(e) => setNewField({...newField, name: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-red-400" required />
+              </div>
+              <div>
+                <label className="text-slate-600 text-sm mb-1 block">Location</label>
+                <input type="text" value={newField.location} onChange={(e) => setNewField({...newField, location: e.target.value})} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-red-400" />
+              </div>
+              <div>
+                <label className="text-slate-600 text-sm mb-2 block">Color Theme</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {FIELD_COLORS.map((color) => (
+                    <button key={color.name} type="button" onClick={() => setNewField({...newField, color: color.name.toLowerCase()})}
+                      className={`h-10 rounded-xl bg-gradient-to-r ${color.from} ${color.to} transition-all ${newField.color === color.name.toLowerCase() ? 'ring-2 ring-offset-2 ring-slate-400 scale-105' : 'hover:scale-105'}`}>
+                      {newField.color === color.name.toLowerCase() && <span className="text-white text-lg">✓</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="border-t pt-4">
+                <p className="text-slate-600 text-sm font-medium mb-3">Allowance Budgets</p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-slate-500 text-xs mb-1 block">🚗 Transport</label>
+                    <input type="number" step="0.01" value={newField.transportAmount} onChange={(e) => setNewField({...newField, transportAmount: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-red-400" placeholder="0.00" />
+                  </div>
+                  <div>
+                    <label className="text-slate-500 text-xs mb-1 block">🍽️ Meal</label>
+                    <input type="number" step="0.01" value={newField.mealAmount} onChange={(e) => setNewField({...newField, mealAmount: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-red-400" placeholder="0.00" />
+                  </div>
+                  <div>
+                    <label className="text-slate-500 text-xs mb-1 block">🏨 Hotel</label>
+                    <input type="number" step="0.01" value={newField.hotelAmount} onChange={(e) => setNewField({...newField, hotelAmount: e.target.value})} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-red-400" placeholder="0.00" />
+                  </div>
+                </div>
+              </div>
               <button type="submit" className="w-full bg-slate-800 text-white p-3 rounded-xl font-semibold hover:bg-slate-900 transition shadow-sm">Create Field Area</button>
             </form>
           </div>
         </div>
       )}
 
-      <button onClick={() => navigate('/calculator')} className="fixed bottom-6 right-6 w-12 h-12 sm:w-14 sm:h-14 bg-slate-800 text-white rounded-2xl shadow-lg shadow-slate-900/25 hover:bg-slate-900 transition flex items-center justify-center text-xl sm:text-2xl z-40 animate-slide-up">🧮</button>
+      <button onClick={() => navigate('/calculator')} 
+        className="fixed bottom-6 right-6 w-12 h-12 sm:w-14 sm:h-14 bg-slate-800 text-white rounded-2xl shadow-lg shadow-slate-900/25 hover:bg-slate-900 transition flex items-center justify-center text-xl sm:text-2xl z-40 animate-slide-up">
+        🧮
+      </button>
     </div>
   )
 }
