@@ -390,7 +390,7 @@ export default function FieldArea() {
 
             return (
               <div key={allowance.id} className={`rounded-2xl shadow-sm border p-5 animate-slide-up transition-all ${isExcluded ? 'opacity-50 grayscale' : ''} ${color.bg} ${color.border}`}>
-                <div className="flex items-start justify-between mb-4 gap-2">
+                <div className="flex items-start justify-between gap-2 mb-4">
                   <div className="flex items-start gap-3 min-w-0 flex-1">
                     <button onClick={() => toggleExclude(allowance.id)}
                       className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all flex-shrink-0 mt-1 ${
@@ -400,24 +400,26 @@ export default function FieldArea() {
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
                       )}
                     </button>
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0 ${color.light}`}>
+                    <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center text-xl sm:text-2xl flex-shrink-0 ${color.light}`}>
                       {allowance.category === 'transport' ? '🚗' : allowance.category === 'meal' ? '🍽️' : allowance.category === 'hotel' ? '🏨' : '📋'}
                     </div>
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-slate-800 font-semibold truncate">{allowance.name}</h3>
+                      <h3 className="text-slate-800 font-semibold text-sm sm:text-base truncate">{allowance.name}</h3>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <p className={`text-xs ${color.text} font-medium`}>{formatCurrency(remaining)} remaining</p>
                         {isExcluded && <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full flex-shrink-0">Excluded</span>}
-                        <button onClick={() => handleDeleteAllowance(allowance.id)} className="text-slate-300 hover:text-red-400 transition flex-shrink-0">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                        </button>
                       </div>
-                      <p className={`text-xs ${color.text} font-medium`}>{formatCurrency(remaining)} remaining</p>
                     </div>
                   </div>
-                  <button onClick={() => { setSelectedAllowance(allowance); setExpenseForm({ amount: '', description: '', transportType: '' }); setShowExpenseModal(true); }}
-                    className={`px-4 py-2 text-white rounded-xl text-sm font-medium hover:opacity-90 transition bg-gradient-to-r flex-shrink-0 ${color.from} ${color.to}`}>
-                    Spend
-                  </button>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <button onClick={() => handleDeleteAllowance(allowance.id)} className="text-slate-300 hover:text-red-400 transition p-1">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    </button>
+                    <button onClick={() => { setSelectedAllowance(allowance); setExpenseForm({ amount: '', description: '', transportType: '' }); setShowExpenseModal(true); }}
+                      className={`px-3 py-2 sm:px-4 sm:py-2 text-white rounded-xl text-xs sm:text-sm font-medium hover:opacity-90 transition bg-gradient-to-r ${color.from} ${color.to}`}>
+                      Spend
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-3 mb-3">
